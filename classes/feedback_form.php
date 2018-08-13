@@ -150,7 +150,6 @@ class feedback_form extends \moodleform {
                 $mform->addGroup($sectionactions, '', get_string('questionsinsection', 'questionnaire'));
                 if (!empty($feedbacksection->scorecalculation)) {
                     $scorecalculation = unserialize($feedbacksection->scorecalculation);
-                    // Merge arrays maintaining keys.
                     $qvalid = $validquestions;
                     foreach ($scorecalculation as $qid => $score) {
                         unset($qvalid[$qid]);
@@ -161,14 +160,14 @@ class feedback_form extends \moodleform {
                         $questionactions[] = $mform->createElement('html', $weight);
                         $rextra['value'] = $feedbacksection->id . '_' . $qid;
                         unset($rextra['style']);
-                        $questionactions[] = $mform->createElement('image', 'removequestion_' . $feedbacksection->id . '_' . $qid,
-                            $rsrc, $rextra);
+                        $questionactions[] = $mform->createElement('image', 'confirmremovequestion[' . $feedbacksection->id . '][' .
+                            $qid . ']', $rsrc, $rextra);
 
                         $mform->addGroup($questionactions, '', $questionnaire->questions[$qid]->name);
                     }
                     if (!empty($qvalid)) {
                         // Merge arrays maintaining keys.
-                        $qvalid = [0 => get_string('addquestion', 'questionnaire')] + $validquestions;
+                        $qvalid = [0 => get_string('addquestion', 'questionnaire')] + $qvalid;
                         $qselect = [];
                         $qselect[] = $mform->createElement('select', 'addquestion_' . $feedbacksection->id,
                             get_string('addquestiontosection', 'questionnaire'), $qvalid);

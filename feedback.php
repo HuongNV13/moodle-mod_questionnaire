@@ -21,6 +21,7 @@ require_once($CFG->dirroot.'/mod/questionnaire/questionnaire.class.php');
 
 $id = required_param('id', PARAM_INT);    // Course module ID.
 $currentgroupid = optional_param('group', 0, PARAM_INT); // Groupid.
+$action = optional_param('action', '', PARAM_ALPHA);
 
 if (! $cm = get_coursemodule_from_id('questionnaire', $id)) {
     print_error('invalidcoursemodule');
@@ -57,6 +58,20 @@ if (!$questionnaire->capabilities->editquestions) {
 }
 
 $feedbacksections = $DB->get_records('questionnaire_fb_sections', ['survey_id' => $questionnaire->sid]);
+
+// We can handle some actions immediately and reload.
+if ($action == 'removequestion') {
+    $sectionid = required_param('sectionid', PARAM_INT);
+    $qid = required_param('qid', PARAM_INT);
+    if (isset($feedbacksections[$sectionid])) {
+        $scorecalculation = unserialize($feedbacksections[$sectionid]->scorecalculation);
+        unset($scorecalculation[$qid]);
+        $scorecalculation = serialize($scorecalculation);
+        $DB->set_field('questionnaire_fb_sections', 'scorecalculation', $scorecalculation, ['id' => $sectionid]);
+        $feedbacksections[$sectionid]->scorecalculation = $scorecalculation;
+    }
+}
+
 // Get all questions that are valid feedback questions.
 $validquestions = [];
 foreach ($questionnaire->questions as $question) {
@@ -146,6 +161,13 @@ if ($settings = $feedbackform->get_data()) {
 
     } else if (isset($settings->deletesection)) {
 
+    } else if (isset($fullform->confirmremovequestion)) {
+        $sectionid = key($fullform->confirmremovequestion);
+        $qid = key($fullform->confirmremovequestion[$sectionid]);
+        $url = new moodle_url($CFG->wwwroot.'/mod/questionnaire/feedback.php',
+            ['id' => $cm->id, 'sectionid' => $sectionid, 'action' => 'confirmremovequestion', 'qid' => $qid]);
+        redirect($url);
+
     } else {
         foreach ($feedbacksections as $feedbacksection) {
             if (isset($settings->{'savesection' . $feedbacksection->id})) {
@@ -153,7 +175,7 @@ if ($settings = $feedbackform->get_data()) {
                 // Check for added question.
                 $addquestion = 'addquestion_' . $feedbacksection->id;
                 if (isset($settings->$addquestion) && ($settings->$addquestion != 0)) {
-                    $scorecalculation[$settings->$addquestion] = 0;
+                    $scorecalculation[$settings->$addquestion] = 1;
                 }
                 // Get all current asigned questions.
                 foreach ($validquestions as $qid => $question) {
@@ -178,6 +200,23 @@ $PAGE->set_heading(format_string($course->fullname));
 $PAGE->navbar->add(get_string('editingfeedback', 'questionnaire'));
 echo $questionnaire->renderer->header();
 require('tabs.php');
-$questionnaire->page->add_to_page('formarea', $feedbackform->render());
+
+// Handle confirmations differently.
+if ($action == 'confirmremovequestion') {
+    $sectionid = required_param('sectionid', PARAM_INT);
+    $qid = required_param('qid', PARAM_INT);
+    $msg = '<div class="warning centerpara"><p>'.get_string('confirmremovequestion', 'questionnaire').'</p></div>';
+    $args = ['id' => $questionnaire->cm->id, 'sectionid' => $sectionid];
+    $urlno = new moodle_url('/mod/questionnaire/feedback.php', $args);
+    $args['action'] = 'removequestion';
+    $args['qid'] = $qid;
+    $urlyes = new moodle_url('/mod/questionnaire/feedback.php', $args);
+    $buttonyes = new single_button($urlyes, get_string('yes'));
+    $buttonno = new single_button($urlno, get_string('no'));
+    $questionnaire->page->add_to_page('formarea', $questionnaire->renderer->confirm($msg, $buttonyes, $buttonno));
+} else {
+    $questionnaire->page->add_to_page('formarea', $feedbackform->render());
+}
+
 echo $questionnaire->renderer->render($questionnaire->page);
 echo $questionnaire->renderer->footer($course);

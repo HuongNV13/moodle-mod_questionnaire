@@ -101,6 +101,7 @@ $string['confirmdelgroupresp'] = 'Are you sure you want to delete ALL the respon
 $string['confirmdelquestion'] = 'Are you sure you want to delete the question at position {$a}?';
 $string['confirmdelquestionresps'] = 'This will also delete the {$a} response(s) already given to that question.';
 $string['confirmdelresp'] = 'Are you sure you want to delete the response by&nbsp;{$a}&nbsp;?';
+$string['confirmremovequestion'] = 'Are you sure you want to remove this question from the section?';
 $string['confpage'] = 'Heading text';
 $string['confpage_help'] = 'Heading (in bold) and body text for the "Confirmation" page displayed after a user completes this questionnaire. (URL, if present, takes precedence over confirmation text.) If you leave this field empty, a default message will be displayed upon questionnaire completion (Thank you for completing this Questionnaire).';
 $string['confpagedesc'] = 'Heading (in bold) and body text for the &quot;Confirmation&quot; page displayed after a user completes this questionnaire. (URL, if present, takes precedence over confirmation text.)';
