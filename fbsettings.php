@@ -18,7 +18,9 @@ require_once("../../config.php");
 require_once($CFG->dirroot.'/mod/questionnaire/questionnaire.class.php');
 
 $id = required_param('id', PARAM_INT); // Course module ID.
-$sectionid = required_param('sectionid', PARAM_INT);
+$sectionid = optional_param('sectionid', 0, PARAM_INT);
+$sectionlabel = optional_param('sectionlabel', '', PARAM_TEXT);
+
 if (! $cm = get_coursemodule_from_id('questionnaire', $id)) {
     print_error('invalidcoursemodule');
 }
@@ -35,7 +37,8 @@ require_course_login($course, true, $cm);
 $context = context_module::instance($cm->id);
 require_once($CFG->dirroot.'/mod/questionnaire/lib.php');
 
-$url = new moodle_url($CFG->wwwroot.'/mod/questionnaire/fbsettings.php', ['id' => $id, 'sectionid' => $sectionid]);
+$url = new moodle_url($CFG->wwwroot.'/mod/questionnaire/fbsettings.php',
+    ['id' => $id, 'sectionid' => $sectionid, 'sectionlabel' => $sectionlabel]);
 $PAGE->set_url($url);
 $PAGE->set_context($context);
 
@@ -50,6 +53,7 @@ $sdata = clone($questionnaire->survey);
 $sdata->sid = $sid;
 $sdata->id = $cm->id;
 $sdata->sectionid = $sectionid;
+$sdata->sectionlabel = $sectionlabel;
 
 $feedbacksections = $questionnaire->survey->feedbacksections;
 
@@ -66,8 +70,7 @@ if ($section = $DB->get_record('questionnaire_fb_sections', ['id' => $sectionid]
     $sdata->sectionheading = array('text' => $currentinfo, 'format' => FORMAT_HTML, 'itemid' => $draftideditor);
 }
 
-$feedbackform = new \mod_questionnaire\feedback_section_form(null,
-    ['currentsection' => $currentsection, 'sectionid' => $sectionid]);
+$feedbackform = new \mod_questionnaire\feedback_section_form(null, ['sectionid' => $sectionid]);
 $feedbackform->set_data($sdata);
 if ($feedbackform->is_cancelled()) {
     // Redirect to view questionnaire page.
@@ -91,6 +94,10 @@ if ($settings = $feedbackform->get_data()) {
     // Save current section.
     $section = new stdClass();
     $section->survey_id = $sid;
+    if (!isset($currentsection)) {
+        $currentsection = $DB->get_field('questionnaire_fb_sections', 'MAX(section) as currentsection', ['survey_id' => $sid]);
+        $currentsection++;
+    }
     $section->section = $currentsection;
     $section->scorecalculation = $scorecalculation;
     $section->sectionlabel = $settings->sectionlabel;

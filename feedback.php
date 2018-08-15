@@ -70,6 +70,13 @@ if ($action == 'removequestion') {
         $DB->set_field('questionnaire_fb_sections', 'scorecalculation', $scorecalculation, ['id' => $sectionid]);
         $feedbacksections[$sectionid]->scorecalculation = $scorecalculation;
     }
+} else if ($action == 'deletesection') {
+    $sectionid = required_param('sectionid', PARAM_INT);
+    if (isset($feedbacksections[$sectionid])) {
+        $DB->delete_records('questionnaire_feedback', ['section_id' => $sectionid]);
+        $DB->delete_records('questionnaire_fb_sections', ['id' => $sectionid]);
+        unset($feedbacksections[$sectionid]);
+    }
 }
 
 // Get all questions that are valid feedback questions.
@@ -82,6 +89,7 @@ foreach ($questionnaire->questions as $question) {
 $customdata = new stdClass();
 $customdata->feedbacksections = $feedbacksections;
 $customdata->validquestions = $validquestions;
+$customdata->survey = $questionnaire->survey;
 
 $feedbackform = new \mod_questionnaire\feedback_form('feedback.php', $customdata);
 $sdata = clone($questionnaire->survey);
@@ -119,7 +127,7 @@ if ($settings = $feedbackform->get_data()) {
             $sdata->feedbacknotes = '';
         }
 
-        if (isset ($settings->feedbacksections)) {
+        if (isset($settings->feedbacksections)) {
             $sdata->feedbacksections = $settings->feedbacksections;
             $usergraph = get_config('questionnaire', 'usergraph');
             if ($usergraph) {
@@ -138,28 +146,35 @@ if ($settings = $feedbackform->get_data()) {
         if (!($sid = $questionnaire->survey_update($sdata))) {
             print_error('couldnotcreatenewsurvey', 'questionnaire');
         } else {
+            if (($sdata->feedbacksections == 1) && empty($feedbacksections)) {
+                $feedbacksection = new stdClass();
+                $feedbacksection->survey_id = $sid;
+                $feedbacksection->section = 1;
+                $feedbacksection->scorecalculation = '';
+                $feedbacksection->sectionlabel = get_string('feedbackglobal', 'questionnaire');
+                $feedbacksection->sectionheading = '';
+                $feedbacksection->sectionheadingformat = 1;
+                $feedbacksection->id = $DB->insert_record('questionnaire_fb_sections', $feedbacksection);
+                $feedbacksections[$feedbacksection->id] = $feedbacksection;
+            }
             $redirecturl = $CFG->wwwroot . '/mod/questionnaire/feedback.php?id=' . $questionnaire->cm->id;
             redirect($redirecturl, get_string('settingssaved', 'questionnaire'));
-
-            // Delete existing section and feedback records for this questionnaire if any were previously set and None are wanted now
-            // or Global feedback is now wanted.
-            if ($sdata->feedbacksections == 0 || ($questionnaire->survey->feedbacksections > 1 && $sdata->feedbacksections == 1)) {
-                if ($feedbacksections = $DB->get_records('questionnaire_fb_sections', ['survey_id' => $sid], '', 'id')) {
-                    foreach ($feedbacksections as $key => $feedbacksection) {
-                        $DB->delete_records('questionnaire_feedback', ['section_id' => $key]);
-                    }
-                    $DB->delete_records('questionnaire_fb_sections', ['survey_id' => $sid]);
-                }
-            }
         }
     } else if (isset($settings->addnewsection)) {
+        $url = new moodle_url($CFG->wwwroot.'/mod/questionnaire/fbsettings.php',
+            ['id' => $cm->id, 'sectionlabel' => $settings->sectionlabel]);
+        redirect($url);
 
     } else if (isset($fullform->editsection)) {
         $url = new moodle_url($CFG->wwwroot.'/mod/questionnaire/fbsettings.php',
             ['id' => $cm->id, 'sectionid' => key($fullform->editsection)]);
         redirect($url);
 
-    } else if (isset($settings->deletesection)) {
+    } else if (isset($fullform->confirmdeletesection)) {
+        $sectionid = key($fullform->confirmdeletesection);
+        $url = new moodle_url($CFG->wwwroot.'/mod/questionnaire/feedback.php',
+            ['id' => $cm->id, 'sectionid' => $sectionid, 'action' => 'confirmdeletesection']);
+        redirect($url);
 
     } else if (isset($fullform->confirmremovequestion)) {
         $sectionid = key($fullform->confirmremovequestion);
@@ -205,11 +220,22 @@ require('tabs.php');
 if ($action == 'confirmremovequestion') {
     $sectionid = required_param('sectionid', PARAM_INT);
     $qid = required_param('qid', PARAM_INT);
-    $msg = '<div class="warning centerpara"><p>'.get_string('confirmremovequestion', 'questionnaire').'</p></div>';
+    $msg = '<div class="warning centerpara"><p>' . get_string('confirmremovequestion', 'questionnaire') . '</p></div>';
     $args = ['id' => $questionnaire->cm->id, 'sectionid' => $sectionid];
     $urlno = new moodle_url('/mod/questionnaire/feedback.php', $args);
     $args['action'] = 'removequestion';
     $args['qid'] = $qid;
+    $urlyes = new moodle_url('/mod/questionnaire/feedback.php', $args);
+    $buttonyes = new single_button($urlyes, get_string('yes'));
+    $buttonno = new single_button($urlno, get_string('no'));
+    $questionnaire->page->add_to_page('formarea', $questionnaire->renderer->confirm($msg, $buttonyes, $buttonno));
+} else if ($action == 'confirmdeletesection') {
+    $sectionid = required_param('sectionid', PARAM_INT);
+    $msg = '<div class="warning centerpara"><p>'.get_string('confirmdeletesection', 'questionnaire').'</p></div>';
+    $args = ['id' => $questionnaire->cm->id];
+    $urlno = new moodle_url('/mod/questionnaire/feedback.php', $args);
+    $args['action'] = 'deletesection';
+    $args['sectionid'] = $sectionid;
     $urlyes = new moodle_url('/mod/questionnaire/feedback.php', $args);
     $buttonyes = new single_button($urlyes, get_string('yes'));
     $buttonno = new single_button($urlno, get_string('no'));

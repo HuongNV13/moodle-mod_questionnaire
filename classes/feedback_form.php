@@ -43,6 +43,7 @@ class feedback_form extends \moodleform {
 
         $feedbacksections = $this->_customdata->feedbacksections;
         $validquestions = $this->_customdata->validquestions;
+        $survey = $this->_customdata->survey;
 
         // Questionnaire Feedback Sections and Messages.
         if (!empty($validquestions)) {
@@ -124,59 +125,75 @@ class feedback_form extends \moodleform {
 
             $mform->addElement('submit', 'feedbacksettingsbutton', get_string('savesettings', 'questionnaire'));
 
-            // Add new section.
-            $mform->addElement('header', 'sections', get_string('feedbacksectionsselect', 'questionnaire'));
-            $addnewsectionarray = [];
-            $addnewsectionarray[] = $mform->createElement('text', 'sectionlabel',
-                get_string('feedbacksectionlabel', 'questionnaire'));
-            $mform->setType('sectionlabel', PARAM_TEXT);
-            $addnewsectionarray[] = $mform->createElement('submit', 'addnewsection', get_string('addnewsection', 'questionnaire'));
-            $mform->addGroup($addnewsectionarray);
+            if ($survey->feedbacksections > 1) {
+                $mform->addElement('html', '<hr />');
+                $addnewsectionarray = [];
+                $addnewsectionarray[] = $mform->createElement('text', 'sectionlabel',
+                    get_string('feedbacksectionlabel', 'questionnaire'));
+                $mform->setType('sectionlabel', PARAM_TEXT);
+                $addnewsectionarray[] = $mform->createElement('submit', 'addnewsection', get_string('addnewsection', 'questionnaire'));
+                $mform->addGroup($addnewsectionarray);
+            }
 
-            // Sections.
-            $esrc = $questionnaire->renderer->image_url('t/edit');
-            $rsrc = $questionnaire->renderer->image_url('t/delete');
-            $stredit = get_string('edit', 'questionnaire');
-            $strremove = get_string('remove', 'questionnaire');
-            foreach ($feedbacksections as $feedbacksection) {
-                $eextra = ['value' => $feedbacksection->id, 'alt' => $stredit, 'title' => $stredit];
-                $eextra['style'] = 'margin-top:-5em;';
-                $rextra = ['value' => $feedbacksection->id, 'alt' => $strremove, 'title' => $strremove];
-                $rextra['style'] = 'margin-top:-5em;';
-                $mform->addElement('header', 'fbsection_' . $feedbacksection->id, $feedbacksection->sectionlabel);
-                $sectionactions = [];
-                $sectionactions[] = $mform->createElement('image', 'editsection['.$feedbacksection->id.']', $esrc, $eextra);
-                $sectionactions[] = $mform->createElement('image', 'deletesection['.$feedbacksection->id.']', $rsrc, $rextra);
-                $mform->addGroup($sectionactions, '', get_string('questionsinsection', 'questionnaire'));
-                if (!empty($feedbacksection->scorecalculation)) {
-                    $scorecalculation = unserialize($feedbacksection->scorecalculation);
-                    $qvalid = $validquestions;
-                    foreach ($scorecalculation as $qid => $score) {
-                        unset($qvalid[$qid]);
-                        $questionactions = [];
-                        $weight = '<input type="number" style="width: 4em;" id="weight' . $qid . "_" . $feedbacksection->id . '" ' .
-                                'name="weight|' . $qid . '|' . $feedbacksection->id . '" min="0.0" max="1.0" step="0.01" ' .
-                                'value="'. $score .'">';
-                        $questionactions[] = $mform->createElement('html', $weight);
-                        $rextra['value'] = $feedbacksection->id . '_' . $qid;
-                        unset($rextra['style']);
-                        $questionactions[] = $mform->createElement('image', 'confirmremovequestion[' . $feedbacksection->id . '][' .
-                            $qid . ']', $rsrc, $rextra);
-
-                        $mform->addGroup($questionactions, '', $questionnaire->questions[$qid]->name);
-                    }
-                    if (!empty($qvalid)) {
-                        // Merge arrays maintaining keys.
-                        $qvalid = [0 => get_string('addquestion', 'questionnaire')] + $qvalid;
-                        $qselect = [];
-                        $qselect[] = $mform->createElement('select', 'addquestion_' . $feedbacksection->id,
-                            get_string('addquestiontosection', 'questionnaire'), $qvalid);
-                        $qselect[] = $mform->createElement('submit', 'savesection' . $feedbacksection->id,
-                            get_string('savesettings', 'questionnaire'));
-                        $mform->addGroup($qselect, '', get_string('addquestiontosection', 'questionnaire'));
+            if ($survey->feedbacksections > 0) {
+                // Sections.
+                $esrc = $questionnaire->renderer->image_url('t/edit');
+                $rsrc = $questionnaire->renderer->image_url('t/delete');
+                $stredit = get_string('edit', 'questionnaire');
+                $strremove = get_string('remove', 'questionnaire');
+                foreach ($feedbacksections as $feedbacksection) {
+                    $eextra = ['value' => $feedbacksection->id, 'alt' => $stredit, 'title' => $stredit];
+                    $eextra['style'] = 'margin-top:-5em;';
+                    $rextra = ['value' => $feedbacksection->id, 'alt' => $strremove, 'title' => $strremove];
+                    $rextra['style'] = 'margin-top:-5em;';
+                    if ($survey->feedbacksections == 1) {
+                        $label = get_string('feedbackglobal', 'questionnaire');
                     } else {
-                        $mform->addElement('submit', 'savesection' . $feedbacksection->id,
-                            get_string('savesettings', 'questionnaire'));
+                        $label = $feedbacksection->sectionlabel;
+                    }
+                    $mform->addElement('header', 'fbsection_' . $feedbacksection->id, $label);
+                    $sectionactions = [];
+                    $sectionactions[] = $mform->createElement('image', 'editsection[' . $feedbacksection->id . ']', $esrc, $eextra);
+                    if ($survey->feedbacksections > 1) {
+                        $sectionactions[] = $mform->createElement('image', 'confirmdeletesection[' . $feedbacksection->id . ']',
+                            $rsrc, $rextra);
+                        $mform->addGroup($sectionactions, '', get_string('questionsinsection', 'questionnaire'));
+                        $qvalid = $validquestions;
+                        if (!empty($feedbacksection->scorecalculation)) {
+                            $scorecalculation = unserialize($feedbacksection->scorecalculation);
+                            foreach ($scorecalculation as $qid => $score) {
+                                unset($qvalid[$qid]);
+                                $questionactions = [];
+                                $weight = '<input type="number" style="width: 4em;" id="weight' . $qid . "_" . $feedbacksection->id . '" ' .
+                                    'name="weight|' . $qid . '|' . $feedbacksection->id . '" min="0.0" max="1.0" step="0.01" ' .
+                                    'value="' . $score . '">';
+                                $questionactions[] = $mform->createElement('html', $weight);
+                                $rextra['value'] = $feedbacksection->id . '_' . $qid;
+                                unset($rextra['style']);
+                                $questionactions[] = $mform->createElement('image', 'confirmremovequestion[' . $feedbacksection->id . '][' .
+                                    $qid . ']', $rsrc, $rextra);
+
+                                $mform->addGroup($questionactions, '', $questionnaire->questions[$qid]->name);
+                            }
+                        }
+                        if (!empty($qvalid)) {
+                            // Merge arrays maintaining keys.
+                            $qvalid = [0 => get_string('addquestion', 'questionnaire')] + $qvalid;
+                            $qselect = [];
+                            $qselect[] = $mform->createElement('select', 'addquestion_' . $feedbacksection->id,
+                                get_string('addquestiontosection', 'questionnaire'), $qvalid);
+                            $qselect[] = $mform->createElement('submit', 'savesection' . $feedbacksection->id,
+                                get_string('savesettings', 'questionnaire'));
+                            $mform->addGroup($qselect, '', get_string('addquestiontosection', 'questionnaire'));
+                        } else {
+                            $mform->addElement('submit', 'savesection' . $feedbacksection->id,
+                                get_string('savesettings', 'questionnaire'));
+                        }
+                    } else {
+                        $mform->addGroup($sectionactions, '');
+                    }
+                    if ($survey->feedbacksections == 1) {
+                        break;
                     }
                 }
             }

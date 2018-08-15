@@ -50,8 +50,8 @@ class feedback_section_form extends \moodleform {
             $feedbackheading = get_string('feedbackglobalheading', 'questionnaire');
             $feedbackmessages = get_string('feedbackglobalmessages', 'questionnaire');
         } else {
-            $feedbackheading = get_string('feedbacksectionheading', 'questionnaire', $fbsection->section.'/'.$feedbacksections);
-            $feedbackmessages = get_string('feedbackmessages', 'questionnaire', $fbsection->section.'/'.$feedbacksections);
+            $feedbackheading = get_string('feedbacksectionheading', 'questionnaire');
+            $feedbackmessages = get_string('feedbackmessages', 'questionnaire');
         }
 
         $mform->addElement('header', 'contenthdr', $feedbackheading);
